@@ -131,7 +131,7 @@ class SATNet(nn.Module):
         >>> pred = sat(z, is_input)
     '''
 
-    def __init__(self, n, m, aux=0, max_iter=40, eps=1e-4, prox_lam=1e-2, weight_normalize=True):
+    def __init__(self, n, m, aux=0, max_iter=40, eps=1e-4, prox_lam=1e-2, weight_normalize=True, leak_labels=True):
         super(SATNet, self).__init__()
 
         S_t = torch.FloatTensor(n+1+aux, m)    # n+1 for truth vector
@@ -140,17 +140,18 @@ class SATNet(nn.Module):
 
         self.S = nn.Parameter(S_t)
         self.aux = aux 
+        self.leak_labels = leak_labels
         self.max_iter, self.eps, self.prox_lam = max_iter, eps, prox_lam
 
     def forward(self, z, is_input):
         B = z.size(0)
         device = 'cuda' if self.S.is_cuda else 'cpu'
-        m = self.S.shape[1]
-        if device == 'cpu' and m%4 != 0:
-            raise ValueError('m is required to be a multiple of 4 on CPU for SSE acceleration. Now '+str(m))
         is_input = insert_constants(is_input.data, 1, 1, 0, self.aux)
         z = torch.cat([torch.ones(z.size(0),1,device=device), z, torch.zeros(z.size(0),self.aux,device=device)],dim=1)
 
         z = MixingFunc.apply(self.S, z, is_input, self.max_iter, self.eps, self.prox_lam)
+
+        if not self.leak_labels:
+            z = z*(1 - is_input).float()
 
         return z[:,1:self.S.size(0)-self.aux]
