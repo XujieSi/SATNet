@@ -1,95 +1,130 @@
-# SATNet • [![PyPi][pypi-image]][pypi] [![colab][colab-image]][colab] [![License][license-image]][license] 
+# Techniques for Symbol Grounding with SATNet
 
-[license-image]: https://img.shields.io/badge/License-MIT-yellow.svg
-[license]: LICENSE
+> Sever Topan, David Rolnick & Xujie Si
 
-[pypi-image]: https://img.shields.io/pypi/v/satnet.svg
-[pypi]: https://pypi.python.org/pypi/satnet
+This repository is the official implementation of [Techniques for Symbol Grounding with SATNet](https://arxiv.org/abs/2106.11072).  This is a fork of the original SATNet implementation, the README of which can be found [here](satnet-README.md).
 
-[colab-image]: https://colab.research.google.com/assets/colab-badge.svg
-[colab]: https://colab.research.google.com/drive/1dRfepPLEE8N6BBZhXz8bbLDcPnRKaOcJ#forceEdit=true&offline=true&sandboxMode=true
+![](images/our-method.png)
 
-*Bridging deep learning and logical reasoning using a differentiable satisfiability solver.*
-
-This repository contains the source code to reproduce the experiments in the ICML 2019 paper [SATNet: Bridging deep learning and logical reasoning using a differentiable satisfiability solver](https://arxiv.org/abs/1905.12149) by [Po-Wei Wang](https://powei.tw/), [Priya L. Donti](https://priyadonti.com/), [Bryan Wilder](http://teamcore.usc.edu/people/bryanwilder/default.htm), and [J. Zico Kolter](http://zicokolter.com/).
-
-
-## What is SATNet
-
-SATNet is a differentiable (smoothed) maximum satisfiability (MAXSAT) solver that can be integrated into the loop of larger deep learning systems. This (approximate) solver is based upon a fast coordinate descent approach to solving the semidefinite program (SDP) associated with the MAXSAT problem.
-
-#### How SATNet works
-
-A SATNet layer takes as input the discrete or probabilistic assignments of known MAXSAT variables, and outputs guesses for the assignments of unknown variables via a MAXSAT SDP relaxation with weights *S*. A schematic depicting the forward pass of this layer is shown below. To obtain the backward pass, we analytically differentiate through the SDP relaxation (see the paper for more details).
-
-![Forward pass](images/poster_forward.png)
-
-#### Overview of experiments
-
-We show that by integrating SATNet into end-to-end learning systems, we can learn the logical structure of challenging problems in a minimally supervised fashion. In particular, we show that we can:
-* Learn the **parity function** using single-bit supervision (a traditionally hard task for deep networks) 
-* Learn how to play **9×9 Sudoku (original and permuted)** solely from examples. 
-* Solve a **"visual Sudoku"** problem that maps images of Sudoku puzzles to their associated logical solutions. (A sample "visual Sudoku" input is shown below.)
-
-<div style="text-align:center"><img src="images/mnist_sudoku.png" /></div>
-<!-- ![MNIST Sudoku](images/mnist_sudoku.png) -->
 
 
 ## Installation
 
-### Via pip
-```bash
-pip install satnet
+Note: we run all subsequent commands from the satnet base repo folder unless otherwise specified.
+
+Initialize submodules (used for InfoGAN training).
+```
+git submodule init
+git submodule update
 ```
 
-
-### From source
-```bash
-git clone https://github.com/locuslab/SATNet
-cd SATNet && python setup.py install
-```
-
-#### Package Dependencies
-```
-conda install -c pytorch tqdm
-```
-The package also depends on the nvcc compiler. If it doesn't exist (try nvcc from commandline), you can install it via
-```
-conda install -c conda-forge cudatoolkit-dev
-```
-
-
-
-### Via Docker image
+Load up the appropriate docker.
 ```bash
 cd docker
 sh ./build.sh
 sh ./run.sh
 ```
 
-## Running experiments
-### Jupyter Notebook and Google Colab
-[Jupyter notebook](https://github.com/locuslab/SATNet/blob/master/notebooks/Learning%20and%20Solving%20Sudoku%20via%20SATNet.ipynb)
-and [Google Colab](https://colab.research.google.com/drive/1dRfepPLEE8N6BBZhXz8bbLDcPnRKaOcJ#forceEdit=true&offline=true&sandboxMode=true)
+Install local pip dependencies.
+```
+pip install -e .
+pip install -r requirements.txt
+```
 
-### Run them manually
-
-#### Getting the datasets
-The [Sudoku dataset](https://powei.tw/sudoku.zip) and [Parity dataset](https://powei.tw/parity.zip) can be downloaded via
-
+Next, download datasets
 ```bash
 wget -cq powei.tw/sudoku.zip && unzip -qq sudoku.zip
 wget -cq powei.tw/parity.zip && unzip -qq parity.zip
 ```
-#### Sudoku experiments (original, permuted, and visual)
-```bash
-python exps/sudoku.py
-python exps/sudoku.py --perm
-python exps/sudoku.py --mnist --batchSz=50
+
+## Running Experiments
+
+Note that all models will be saved under the `logs` folder. All experiments are to be run from the `exps/sudoku` folder.
+
+### 1 Running Experiments from the Base Paper
+
+#### 1.1 Non-Visual
+
+```
+python exps/sudoku/run.py --mode nonvisual
 ```
 
-#### Parity experiments
-```bash
-python exps/parity.py --seq=20
-python exps/parity.py --seq=40
+This operating mode should be unaffected by the `--leak-labels` flag.
+
+#### 1.2 Visual
 ```
+python exps/sudoku/run.py --mode visual --leak-labels
+```
+
+Removing the `--leak-labels` flag will inhibit the model from learning.
+
+### 2 Error Injection
+
+Here we check the performance of a nonvisual sudoku model trained as in 1.1, when we inject a certain number of errors into the test set.
+
+```
+python exps/sudoku/run.py --mode nonvisual --load-model <path to trained nonvisual model> --num-errors 1
+```
+
+We experiment whether the system behaves differently if the injected errors result in solvable vs. unsolvable boards.
+```
+python exps/sudoku/run.py --mode nonvisual --load-model <path to trained nonvisual model> --num-errors 1 --solvability-split <solvable/unsolvable/any>
+```
+
+### 3 Proofread Models
+
+Here we add in the proofreader layer as described in the paper. This step incrementally improves the model, by 0.1% (in the nonvisual case) and roughly 1.5% (in the visual case).
+
+```
+python exps/sudoku/run.py --mode train-proofreader-nonvisual --load-model <path to trained nonvisual model>
+```
+
+The proofreader can also be inserted into a visual model as well with the following command.
+
+```
+python exps/sudoku/run.py train-proofreader-lenet --load-model <path to trained proofread nonvisual model>
+```
+
+As with previous instances, `--leak-labels` will enable label leakage. In this instance, unlike the end-to-end visual learning, leaking the labels should still result in an improvement.
+
+### 4 InfoGAN Frontend
+
+
+#### 4.1 Train InfoGAN
+
+```
+cd exps/sudoku/infogan
+python train.py
+```
+
+#### 4.2 Extract Permutation Matrix Through SATNet
+
+We now train using our Permutation Invariant Loss in order to extract the permutation matrix out of InfoGAN without looking at input cell labels at any point.
+
+```
+python exps/sudoku/run.py --mode train-satnet-visual-infogan --load-model <path-to-infogan>
+```
+
+#### 4.3 Prepare Distillation Dataset
+
+Next, we prepare a dataset from which to train the LeNet formulation of our architecture. Its important to do this in order to pull the learned permutation out of the previous model. During this step it may be a bit tricky to figure out which model from the previous step should be used. Pick the one from the corresponding minimal visual error.
+
+```
+python exps/sudoku/run.py --mode satnet-visual-infogan-generate-dataset --load-model <infogan-model>
+```
+
+This will create dataset files in the pwd. Reference this directory in the next step
+
+#### 4.4 Distill InfoGAN into LeNet
+
+```
+python exps/sudoku/run.py --mode train-backbone-lenet-supervised --infogan-labels-dir <dir with files from 4.3> --load-model <model from 4.2>
+```
+
+#### 4.5 Train Model
+
+```
+python exps/sudoku/run.py --mode visual  --load-model <model from step 4.4>
+```
+
+Optionally the resulting model can then be trained with a proofreader
