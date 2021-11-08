@@ -18,6 +18,12 @@ git submodule init
 git submodule update
 ```
 
+Next, download datasets (in root directory).
+```bash
+wget -cq powei.tw/sudoku.zip && unzip -qq sudoku.zip
+wget -cq powei.tw/parity.zip && unzip -qq parity.zip
+```
+
 Load up the appropriate docker.
 ```bash
 cd docker
@@ -28,14 +34,8 @@ sh ./run.sh
 Install local pip dependencies.
 ```
 pip install -e .
-pip install -r requirements.txt
 ```
 
-Next, download datasets
-```bash
-wget -cq powei.tw/sudoku.zip && unzip -qq sudoku.zip
-wget -cq powei.tw/parity.zip && unzip -qq parity.zip
-```
 
 ## Running Experiments
 
@@ -97,9 +97,11 @@ cd exps/sudoku/infogan
 python train.py
 ```
 
+The training will run for 100 epochs, and the model will be saved after every 5. Use one of these saved files for the next steps. As mentioned in the ablation test within the paper, InfoGAN will sometimes converge to a non-optimal clustering of MNIST digits, which limits the rest of the pipeline's ability to learn. Test accuracy during training should be above the 88% threshold described in the paper. If it isn't, re-run training with a different seed.
+
 #### 4.2 Extract Permutation Matrix Through SATNet
 
-We now train using our Permutation Invariant Loss in order to extract the permutation matrix out of InfoGAN without looking at input cell labels at any point.
+We now train using our Permutation Invariant Loss in order to extract the permutation matrix out of InfoGAN without looking at input cell labels at any point. Make sure to see section 4.6 as an alternative to this step, and the following ones.
 
 ```
 python exps/sudoku/run.py --mode train-satnet-visual-infogan --load-model <path-to-infogan>
@@ -128,3 +130,13 @@ python exps/sudoku/run.py --mode visual  --load-model <model from step 4.4>
 ```
 
 Optionally the resulting model can then be trained with a proofreader
+
+#### 4.6 Run-Pipeline (alternative to 4.2-4.6)
+
+An automation script has been set up to make sections 4.2-4.6 easier to manage. Instead, run:
+
+```
+python run_pipeline.py --load-model <path to infogan>
+```
+
+It will automate the above steps.

@@ -48,7 +48,14 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name='satnet',
     version='0.1.4',
-    install_requires=['torch>=1.3'],
+    install_requires=[
+        'torch>=1.3',
+        'tqdm',
+        'requests',
+        'py-sudoku',
+        'matplotlib',
+        'scipy',
+    ],
     packages=['satnet'],
     ext_modules=ext_modules,
     cmdclass={'build_ext': BuildExtension},
