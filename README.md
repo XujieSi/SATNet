@@ -131,9 +131,9 @@ python exps/sudoku/run.py --mode visual  --load-model <model from step 4.4>
 
 Optionally the resulting model can then be trained with a proofreader
 
-#### 4.6 Run-Pipeline (alternative to 4.2-4.6)
+#### 4.6 Run-Pipeline (alternative to 4.2-4.5)
 
-An automation script has been set up to make sections 4.2-4.6 easier to manage. Instead, run:
+An automation script has been set up to make sections 4.2-4.5 easier to manage. Instead, run:
 
 ```
 python run_pipeline.py --load-model <path to infogan>
