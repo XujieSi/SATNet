@@ -22,7 +22,9 @@ ext_modules = [
             'src/satnet.cpp',
             'src/satnet_cpu.cpp',
         ],
-        extra_compile_args = ['-fopenmp', '-msse4.1', '-Wall', '-g']
+        # extra_compile_args = ['-fopenmp', '-msse4.1', '-Wall', '-g']
+        # disable openmp and sse for macos m1 processor
+        extra_compile_args = ['-Xclang', '-fopenmp', '-Wall', '-g']
     )
 ]
 
@@ -50,11 +52,11 @@ setup(
     version='0.1.4',
     install_requires=[
         'torch>=1.3',
-        'tqdm',
-        'requests',
-        'py-sudoku',
-        'matplotlib',
-        'scipy',
+        #'tqdm',
+        #'requests',
+        #'py-sudoku',
+        #'matplotlib',
+        #'scipy',
     ],
     packages=['satnet'],
     ext_modules=ext_modules,

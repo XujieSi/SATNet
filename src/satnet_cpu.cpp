@@ -4,8 +4,8 @@
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
-#include <xmmintrin.h>
-#include <smmintrin.h>
+// #include <xmmintrin.h>
+// #include <smmintrin.h> 
 #include <float.h>
 
 #include <omp.h>
@@ -25,6 +25,14 @@ const double MEPS = 1e-24;
 /* 
  * Helper functions
  */
+void saxpy(float *y, float a, const float *x, int l)
+{
+  for (int i = 0; i < l; ++i) {
+    y[i] += a * x[i];
+  }
+}
+
+/*
 void saxpy(float *__restrict__ y, float a, const float *__restrict__ x, int l)
 {
     y = (float*)__builtin_assume_aligned(y, 4*sizeof(float));
@@ -37,12 +45,22 @@ void saxpy(float *__restrict__ y, float a, const float *__restrict__ x, int l)
         _mm_store_ps(y, y_);
     }
 }
+*/
 
 void scopy(float *x, float *y, int l)
 {
         memcpy(y, x, sizeof(*x)*(size_t)l);
 }
 
+float sdot(const float* x, const float* y, int l)
+{
+    float s = 0.0;
+    for(int i=0; i < l; ++i) {
+       s += x[i] * y[i];
+    }
+    return s;
+}
+/*
 float sdot(const float *__restrict__ x, const float *__restrict__ y, int l)
 {
     x = (float*)__builtin_assume_aligned(x, 4*sizeof(float));
@@ -59,6 +77,7 @@ float sdot(const float *__restrict__ x, const float *__restrict__ y, int l)
 
     return s_;
 }
+*/
 
 void sscal(float *x, float a, int l)
 {
