@@ -51,7 +51,7 @@ struct MaxSAT {
 
     const int n = this->nvar;
     const int m = this->mclauses;
-    const int k = 32; // embedding dimension size
+    const int k = 16; // embedding dimension size
     params.n = n;
     params.m = m;
     params.b = 1; // batch
@@ -77,12 +77,31 @@ struct MaxSAT {
 
     params.niter = new int32_t (40); // allocate a single int with value 40
 
+    params.Snrms = new float[n];
     params.S = new float [n * m];
     for (int i = 0; i < n; ++i) {
+      float r = 0.0;
       for (int j = 0; j < m; ++j) {
-        params.S[i * m + j] = this->S[j][i];
+        const float sij = this->S[j][i];
+        params.S[i * m + j] = sij;
+        r += sij * sij;
+      }
+      params.Snrms[i] = r;
+    }
+    
+    for (int j = 0; j < m; ++j) {
+      float lits = 0.0;
+      for (int i = 0; i < n; ++i) {
+        const float sij = params.S[i * m + j];
+        if (sij < -0.5 || sij > 0.5) lits += 1.0;
+      }
+      lits = 1.0/sqrtf32(4.0 * lits);
+      for (int i = 0; i < n; ++i) {
+        params.S[i * m + j] *= lits;
       }
     }
+
+
     params.dS = new float [n * m];
     memset(params.dS, 0, sizeof(params.dS));
 
@@ -113,13 +132,10 @@ struct MaxSAT {
 
     params.cache = new float [n];
     params.gnrm = new float [n];
-    params.Snrms = new float[n];
     memset(params.cache, 0, sizeof(params.cache));
     // memset(params.gnrm, 0, sizeof(params.gnrm));
-    // memset(params.Snrms, 0, sizeof(params.Snrms));
     for (int i = 0; i < n; ++i) {
       params.gnrm[i] =  distribution(generator);
-      params.Snrms[i] =  distribution(generator);
     }
   }
 
@@ -127,10 +143,10 @@ struct MaxSAT {
     mix_t params; 
     construct_mix_params(params);
     mix_init_launcher_cpu(params, params.index);
-    mix_forward_launcher_cpu(params, 40, 1e-10);
+    mix_forward_launcher_cpu(params, 10, 1e-10);
 
 
-    for(int i = 1; i < params.n; ++i) {
+    for(int i = 0; i < params.n; ++i) {
       std::cout << " " << params.z[i]; 
     }
     std::cout << std::endl;
