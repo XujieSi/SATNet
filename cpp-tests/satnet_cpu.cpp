@@ -26,14 +26,14 @@ const double MEPS = 1e-24;
 /* 
  * Helper functions
  */
-/*
+
 void saxpy(float* y, float a, const float* x, int l) {
     for (int i = 0; i < l; ++i) {
         y[i] += a * x[i];
     }
-}*/
+}
 
-
+/*
 void saxpy(float *__restrict__ y, float a, const float *__restrict__ x, int l)
 {
     y = (float*)__builtin_assume_aligned(y, 4*sizeof(float));
@@ -46,21 +46,21 @@ void saxpy(float *__restrict__ y, float a, const float *__restrict__ x, int l)
         _mm_store_ps(y, y_);
     }
 }
-
+*/
 
 void scopy(float *x, float *y, int l)
 {
         memcpy(y, x, sizeof(*x)*(size_t)l);
 }
-/*
+
 float sdot (const float* x, const float* y, int l) {
     float res = 0.0;
     for (int i = 0; i < l; ++i) {
         res += x[i] * y[i];
     }
     return res;
-}*/
-
+}
+/* 
 float sdot(const float *__restrict__ x, const float *__restrict__ y, int l)
 {
     x = (float*)__builtin_assume_aligned(x, 4*sizeof(float));
@@ -77,7 +77,7 @@ float sdot(const float *__restrict__ x, const float *__restrict__ y, int l)
 
     return s_;
 }
-
+*/
 
 void sscal(float *x, float a, int l)
 {
@@ -103,6 +103,18 @@ float snrm2(const float *x, int l)
 void szero(float *v, int l)
 {
     memset(v, 0, l*sizeof(*v));
+}
+
+void dbgout_z (const int32_t *index, const float *V, int k) {
+    for (int i,i_=0; (i=index[i_]); i_++) {
+        //float zi = V[i*k];
+        float zi = sdot(V, V+i*k, k);
+        printf("True-vec  V[%d]\n", i);
+        for (int j = 0; j < k; ++j) {
+            printf("%f,%f\n", V[j], V[i*k + j]);
+        }
+        printf("i=%d zi = %f\n", i, zi);
+    }
 }
 
 void mix_init(int32_t *perm, int n, int k, const int32_t *is_input, int32_t *index, const float *z, float *V)
@@ -175,7 +187,25 @@ float mix_kernel(int is_forward, float prox_lam,
         // val = Wk'Si - Sii Vik
         for (int kk=0; kk<k; kk++)
             g[kk] = sdot(Si, W+kk*m, m);
+
+        printf("before normalization-1, g:\n");
+        for (int kk=0; kk<k; kk++){
+            printf("%.4f ", g[kk]);
+        }
+        printf("\n");
         saxpy(g, -Sii, V+i*k, k);
+
+        printf("V[%d]:\n", i);
+        for (int kk=0; kk<k; kk++){
+            printf("%.4f ", V[i * k + kk]);
+        }
+        printf("\n");
+
+        printf("before normalization-2, g:\n");
+        for (int kk=0; kk<k; kk++){
+            printf("%.4f ", g[kk]);
+        }
+        printf("\n");
 
         float gnrmi;
         if (is_forward) { // gnrm is calculated in the forward pass
@@ -192,6 +222,11 @@ float mix_kernel(int is_forward, float prox_lam,
 
         // Equation (A.5)
         sscal(g, 1/gnrmi, k);
+        printf("after normalization, g:\n");
+        for (int kk=0; kk<k; kk++){
+            printf("%.4f ", g[kk]);
+        }
+        printf("\n");
 
         float t;
         for (int kk=0; kk<k; kk++)
@@ -209,8 +244,9 @@ float mix_kernel(int is_forward, float prox_lam,
             delta += dec;
             gnrm[i] = gnrmi;
         }
-
     }
+
+    dbgout_z(index, V, k);
     return delta;
 }
 
@@ -239,7 +275,7 @@ void mix_forward(int max_iter, float eps, int n, int m, int k, const int32_t *in
         float zi = sdot(V, V+i*k, k);
         printf("True-vec  V[%d]\n", i);
         for (int j = 0; j < k; ++j) {
-            printf("%10f  %10f\n", V[j], V[i*k + j]);
+            printf("%f,%f\n", V[j], V[i*k + j]);
         }
         printf("zi = %f\n", zi);
 

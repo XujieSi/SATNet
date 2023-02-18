@@ -77,18 +77,14 @@ struct MaxSAT {
 
     params.niter = new int32_t (40); // allocate a single int with value 40
 
-    params.Snrms = new float[n];
     params.S = new float [n * m];
     for (int i = 0; i < n; ++i) {
-      float r = 0.0;
       for (int j = 0; j < m; ++j) {
         const float sij = this->S[j][i];
         params.S[i * m + j] = sij;
-        r += sij * sij;
       }
-      params.Snrms[i] = r;
     }
-    
+    /*
     for (int j = 0; j < m; ++j) {
       float lits = 0.0;
       for (int i = 0; i < n; ++i) {
@@ -99,7 +95,29 @@ struct MaxSAT {
       for (int i = 0; i < n; ++i) {
         params.S[i * m + j] *= lits;
       }
+    }*/
+    params.Snrms = new float[n];
+    for (int i = 0; i < n; ++i) {
+      float r = 0.0;
+      for (int j = 0; j < m; ++j) {
+        const float sij = params.S[i * m + j];
+        r += sij * sij;
+      }
+      params.Snrms[i] = r;
     }
+
+    printf("Params.S: \n");
+    for (int j = 0; j < m; ++j) {
+      for (int i = 0; i < n; ++i) {
+        printf("%.4f ", params.S[i*m + j]);
+      }
+      printf("\n");
+    }
+    printf("params.Snrms: \n");
+    for (int i = 0; i < n; ++i) {
+      printf("%.4f ", params.Snrms[i]);
+    }
+    printf("\n");
 
 
     params.dS = new float [n * m];
@@ -115,17 +133,6 @@ struct MaxSAT {
 
     params.W = new float [k * m];
 
-    // W = V^T * S
-    for (int i = 0; i < k; ++i) {
-      for  (int j = 0; j < m; ++j) {
-        float res = 0.0; 
-        for (int d = 0; d < n; ++d) {
-          res += params.V[d *k + i] * params.S[d * m + j];
-        }
-        int index = i * m  + j;
-        params.W[index] = res;
-      }
-    }
 
     params.Phi = new float [k * m];
     
@@ -139,10 +146,46 @@ struct MaxSAT {
     }
   }
 
+  void prepare_W(mix_t& params){
+    const int n = params.n;
+    const int m = params.m;
+    const int k = params.k;
+    // W = V^T * S
+    // should be perfomed AFTER V is normalized
+    for (int i = 0; i < k; ++i) {
+      for  (int j = 0; j < m; ++j) {
+        float res = 0.0; 
+        for (int d = 0; d < n; ++d) {
+          res += params.V[d *k + i] * params.S[d * m + j];
+        }
+        int index = i * m  + j;
+        params.W[index] = res;
+      }
+    }
+
+    printf("params.V, shape: %d x %d\n", n, k);
+    for (int i = 0; i< n; ++i) {
+      for (int j = 0; j<k; ++j) {
+        printf("%-7.4f ", params.V[i*k + j]);
+      }
+      printf("\n");
+    }
+
+    printf("params.W, shape: %d x %d\n", k, m);
+    for (int i = 0; i< k; ++i) {
+      for (int j = 0; j<m; ++j) {
+        printf("%-7.4f ", params.W[i*m + j]);
+      }
+      printf("\n");
+    }
+
+  }
+
   void solve() {
     mix_t params; 
     construct_mix_params(params);
     mix_init_launcher_cpu(params, params.index);
+    prepare_W(params);
     mix_forward_launcher_cpu(params, 10, 1e-10);
 
 
@@ -157,8 +200,11 @@ struct MaxSAT {
 
 int main() {
   // m has to be chosen properly, other 16-byte (4-float) SSE alignment will fail and then crash
-  std::vector<std::vector<int>> cnfs = {{1, 0, -1}, {0, 1, -1}, {1, 0, -1}, {0, 1, -1} };
+  // std::vector<std::vector<int>> cnfs = {{1, 0, -1}, {0, 1, -1}, {1, 0, -1}, {0, 1, -1} };
 
+  // parity rules
+
+  std::vector<std::vector<int>> cnfs = {{-1, -1}, {1, 1}};
   MaxSAT ms(cnfs);
 
   ms.show();
