@@ -11,7 +11,7 @@ std::default_random_engine generator;
 std::normal_distribution<float> distribution(0.0,1.0);
 
 struct MaxSAT {
-  int nvar, mclauses, aux;
+  int nvar, mclauses;
   std::vector<std::vector<float>> S; 
   std::vector<int> sol;
 
@@ -120,30 +120,25 @@ struct MaxSAT {
     printf("\n");
 
 
-    params.dS = new float [n * m];
-    memset(params.dS, 0, sizeof(params.dS));
+    //params.dS = new float [n * m];
+    //memset(params.dS, 0, sizeof(params.dS));
 
     params.V = new float [n * k];
-    params.U = new float [n * k];
+    //params.U = new float [n * k];
     for (int i = 0; i < n * k; ++i) {
       params.V[i] = distribution(generator);
-      params.U[i] = distribution(generator);
+      //params.U[i] = distribution(generator);
     }
 
 
     params.W = new float [k * m];
-
-
-    params.Phi = new float [k * m];
+    //params.Phi = new float [k * m];
     
 
     params.cache = new float [n];
     params.gnrm = new float [n];
     memset(params.cache, 0, sizeof(params.cache));
-    // memset(params.gnrm, 0, sizeof(params.gnrm));
-    for (int i = 0; i < n; ++i) {
-      params.gnrm[i] =  distribution(generator);
-    }
+    memset(params.gnrm, 0, sizeof(params.gnrm));
   }
 
   void prepare_W(mix_t& params){
