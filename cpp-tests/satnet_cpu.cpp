@@ -370,18 +370,18 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
     }
     if (invalid_flag) { szero(dz, n); return; }
 
-    printf("before mix_kernel call \n");
-    dbgout2D("U:\n", U, n, k);
-    dbgout2D("V:\n", V, n, k);
-    dbgout2D("Phi:\n", Phi, k, m);
+    // printf("before mix_kernel call \n");
+    // dbgout2D("U:\n", U, n, k);
+    // dbgout2D("V:\n", V, n, k);
+    // dbgout2D("Phi:\n", Phi, k, m);
     
     // solve P (S'S+D_z-D_sii)xI_k P U = -dz P v0
     for (int iter=0; iter<*niter; iter++) {
         mix_kernel(0, prox_lam, m, k, index, S, dz, U, V, Phi, gnrm, Snrms, cache);
-        printf("mix_backward, iter=%d\n", iter);
-        dbgout2D("U:\n", U, n, k);
-        dbgout2D("V:\n", V, n, k);
-        dbgout2D("Phi:\n", Phi, k, m);
+        // printf("mix_backward, iter=%d\n", iter);
+        // dbgout2D("U:\n", U, n, k);
+        // dbgout2D("V:\n", V, n, k);
+        // dbgout2D("Phi:\n", Phi, k, m);
     }
 
     // sanity check
@@ -390,6 +390,7 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
     }
     if (invalid_flag) { szero(dz, n); return; }
 
+    // Note that the gradient sign is reversed here
     // dS = U W + V Phi
     // Equation (B.10)
     // V, U shape: nxk
@@ -405,12 +406,12 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
         }
     }
 
-    printf("after mix_kernel call \n");
-    dbgout2D("U:\n", U, n, k);
-    dbgout2D("V:\n", V, n, k);
-    dbgout2D("Phi:\n", Phi, k, m);
+    // printf("after mix_kernel call \n");
+    // dbgout2D("U:\n", U, n, k);
+    // dbgout2D("V:\n", V, n, k);
+    // dbgout2D("Phi:\n", Phi, k, m);
 
-    dbgout2D("dS after update:\n", dS, n, m);
+    // dbgout2D("dS after update:\n", dS, n, m);
     for(int i = 0; i < n; ++i){
         for(int j=0; j < m; ++j){
             if (dS[i*m + j] > 20) {
@@ -425,7 +426,8 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
              dz[i] = 0;
              continue;
         }
-        float val1 = sdot(S+i*m, Phi+0*m, m), val2 = sdot(S+i*m, Phi+1*m, m); 
+        float val1 = sdot(S+i*m, Phi+0*m, m);
+        float val2 = sdot(S+i*m, Phi+1*m, m); 
         dz[i] = (dz[i] + val1) * sin(z[i]*M_PI)*M_PI + val2 * copysign(cos(z[i]*M_PI)*M_PI, V[i*k+1])*M_PI;
     }
 }
