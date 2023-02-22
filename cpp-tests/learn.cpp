@@ -137,6 +137,20 @@ struct Learner
 
             params.S[i] = r * distribution(generator);
         }
+        std::vector<std::vector<float>> gt = {
+            {-r, -r, -r, -r},
+            {r,   r, -r, -r},
+            {-r,  r, -r,  r},
+            {r,  -r, -r,  r},
+            {0, 0, 0, 0},
+            {0, 0, 0, 0}
+        };
+        for(int i=1; i < n; ++i){
+            for(int j =0; j < m; ++j){
+                const int index = i * m + j;
+                params.S[index] = params.S[index]/100 + gt[i][j];
+            }
+        }
 
         params.dS_sum = new float [n*m];
         params.dS = new float[ b * n * m];
