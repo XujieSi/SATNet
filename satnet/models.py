@@ -142,12 +142,21 @@ class SATNet(nn.Module):
         self.aux = aux 
         self.leak_labels = leak_labels
         self.max_iter, self.eps, self.prox_lam = max_iter, eps, prox_lam
+    
+    def show(self):
+        print(f"S.shape = {self.S.shape}, aux = {self.aux}, max_iter = {self.max_iter}")
+        print(f"S: \n {self.S} ")
+
+    def reset_S(self, s_weight):
+        with torch.no_grad():
+            self.S.copy_(s_weight)
 
     def forward(self, z, is_input):
-        B = z.size(0)
+        B = z.size(0) # batch dimension
         device = 'cuda' if self.S.is_cuda else 'cpu'
         is_input = insert_constants(is_input.data, 1, 1, 0, self.aux)
-        z = torch.cat([torch.ones(z.size(0),1,device=device), z, torch.zeros(z.size(0),self.aux,device=device)],dim=1)
+        # catenate truth vector, ordinary variable value, auxiliary variable value zeros
+        z = torch.cat([torch.ones(B,1,device=device), z, torch.zeros(B,self.aux,device=device)],dim=1)
 
         z = MixingFunc.apply(self.S, z, is_input, self.max_iter, self.eps, self.prox_lam)
 

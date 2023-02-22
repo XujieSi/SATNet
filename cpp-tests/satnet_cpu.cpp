@@ -213,7 +213,12 @@ float mix_kernel(int is_forward, float prox_lam,
         for (int kk=0; kk<k; kk++)
             g[kk] = sdot(Si, W+kk*m, m);
 
+        // dbgout1D("Si[0]:\n", Si, m);
+        // dbgout1D("W[0]:\n", W, m);
+        // dbgout1D("g-1:\n", g, k);
+        // dbgout1D("V+i*k:\n", V+i*k, k);
         saxpy(g, -Sii, V+i*k, k);
+        // dbgout1D("g-2:\n", g, k);
 
 
         float gnrmi;
@@ -239,6 +244,7 @@ float mix_kernel(int is_forward, float prox_lam,
             // dloss/dv_o = dz_i * V_true
 
             saxpy(g, -dz[i], Vproj, k); // g - dloss/dv_o
+            // dbgout1D("g-3:\n", g, k);
 
             // P_o = I_k - v_o * v'_o
             std::vector<float> tv(k,0.0); 
@@ -252,6 +258,7 @@ float mix_kernel(int is_forward, float prox_lam,
             for(int r =0; r < k; ++r) {
                 g[r] = tv[r];
             }
+            // dbgout1D("g-4:\n", g, k);
 
             sscal(g, -1, k);
             // END OF NEW IMPLEMENTATION 
@@ -282,9 +289,14 @@ float mix_kernel(int is_forward, float prox_lam,
         for (int kk=0; kk<k; kk++)
             t = g[kk], g[kk] -= V[i*k+kk], V[i*k+kk] = t;
 
+        // dbgout1D("g-5:\n", g, k);
+        const float dec =  gnrmi * sdot(g, g, k);
+        // printf("coordinate update on dimention %d, dec: %f, gnrmi: %f\n", i, dec, gnrmi);
+
         for (int kk = 0; kk < k; ++kk) {
             if (V[i*k +kk] > 100 || V[i*k + kk] < -100) {
-                printf("the value is too large!!\n");
+                printf("the value is too large!! %d-th variable, dimension %d, V: %f\n", i, kk, V[i*k+kk]);
+                printf("\n");
             }
         }
 
@@ -320,6 +332,13 @@ void mix_forward(int max_iter, float eps, int n, int m, int k, const int32_t *in
     
         if (iter && delta < eps) break;
         if (iter == 0) eps = delta*eps;
+    }
+
+    dbgout1D("In mix_forward, after mixing, V:\n", V, k);
+    for(int i = 0; i < k; ++i){
+        if(V[i] > 1.0 || V[i] < -1.0) {
+            printf("V[%d] = %f is too large!",i, V[i]);
+        }
     }
 
     *niter = iter;
@@ -377,8 +396,8 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
     
     // solve P (S'S+D_z-D_sii)xI_k P U = -dz P v0
     for (int iter=0; iter<*niter; iter++) {
+        // printf("mix_backward, iter=%d out of %d\n", iter, *niter);
         mix_kernel(0, prox_lam, m, k, index, S, dz, U, V, Phi, gnrm, Snrms, cache);
-        // printf("mix_backward, iter=%d\n", iter);
         // dbgout2D("U:\n", U, n, k);
         // dbgout2D("V:\n", V, n, k);
         // dbgout2D("Phi:\n", Phi, k, m);
@@ -415,10 +434,13 @@ void mix_backward(float prox_lam, int n, int m, int k, int32_t *is_input, int32_
     for(int i = 0; i < n; ++i){
         for(int j=0; j < m; ++j){
             if (dS[i*m + j] > 20) {
-                printf("dS is too large!");
+                printf("dS is too large! r=%d c=%d grad=%f\n", i, j, dS[i*m+j]);
+                printf("\n");
             }
         }
     }
+
+    sscal(dS, -1.0, n * m); // the following code computing dz may not make sense after this
 
     // dzi = v0'Phi si
     for (int i=1; i<n; i++) {
@@ -450,6 +472,7 @@ void mix_forward_launcher_cpu(mix_t mix, int max_iter, float eps)
     for (int i=0; i<mix.b; i++) {
         printf("\n***batch = %d, mix_forward ***\n", i);
         // dbgout2D("before mixing, V:\n", mix.V + i * n * k, n, k);
+        // dbgout2D("before mixing, W:\n", mix.W, k, m);
 
         mix_forward(max_iter, eps,
             mix.n, mix.m, mix.k, mix.index+i*n, mix.niter+i, 

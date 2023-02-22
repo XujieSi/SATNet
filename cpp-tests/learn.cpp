@@ -1,27 +1,31 @@
-
-
 #include "satnet.h"
 #include <vector>
 #include <cstring>
 #include <iostream>
 #include <random>
 #include <cstdalign>
+#include <algorithm>
 
 std::default_random_engine generator;
 std::normal_distribution<float> distribution(0.0, 1.0);
+
+void szero(float *v, int l)
+{
+    memset(v, 0, l*sizeof(*v));
+}
 
 struct AdamSNet {
     const float eps = 1e-8;
     float alpha = 0.01;   // step size
     float *m, beta1 = 0.9, beta1_t=1.0; // 1st order moment and decay
     float *v, beta2 = 0.999, beta2_t=1.0; // 2nd order moment and decay
-    int rows, cols;
+    const int rows, cols;
 
     AdamSNet(int r, int c) : rows(r), cols(c) {
         m = new float [r * c];
         v = new float [r * c];
-        memset(m, 0, sizeof(m));
-        memset(v, 0, sizeof(v));
+        szero(m, r * c);
+        szero(v, r * c);
     }
 
     void step(float *theta, const float *grad) {
@@ -41,7 +45,11 @@ struct AdamSNet {
                 const float c_m = m[index] / (1.0 - beta1_t);
                 const float c_v = v[index] / (1.0 - beta2_t);
 
-                theta[index] -= alpha * c_m / (eps + fsqrt(c_v)); // our grads have been negated before this
+                const float delta = alpha * c_m / (eps + fsqrt(c_v));
+                if(delta > 0.001) {
+                    printf("delta=%f is too large!\n", delta);
+                }
+                theta[index] -= delta;
             }
         }
 
@@ -64,7 +72,9 @@ struct Learner
         perm.clear();
         io_dims.clear();
         for (int i = 0; i < n; ++i) {
-            perm.push_back(i);
+            if(i < n-1){
+                perm.push_back(i);
+            }
             io_dims.push_back(false);
         }
         io_dims[0] = true;
@@ -86,7 +96,8 @@ struct Learner
 
         // input/output learning signals
         params.is_input = new int32_t[b * n];
-        memset(params.is_input, 0, sizeof(params.is_input));
+        memset(params.is_input, 0, b * n * sizeof(int32_t));
+
         params.z = new float[b * n];
 
         for (int j = 0; j < b; ++j) {
@@ -136,9 +147,6 @@ struct Learner
         params.W = new float[b * k * m];
         params.Phi = new float[b * k * m];
 
-        // memset(params.cache, 0, sizeof(params.cache));
-        // memset(params.gnrm, 0, sizeof(params.gnrm));
-
         params.V = new float [b * n * k];
         for (int i = 0; i < b * n * k; ++i) {
             params.V[i] = distribution(generator);
@@ -167,10 +175,11 @@ struct Learner
     }
 
     void compute_dz(mix_t& params ) {
-        memset(params.dz, 0, sizeof(params.dz));
-
         const int n = params.n;
-        for (int j = 0; j < params.b; ++j){
+        const int b = params.b;
+        szero(params.dz, b * n);
+
+        for (int j = 0; j < b; ++j){
             for (int i = 0; i < n; ++i) {
                 if(io_dims[i]) continue; 
                 const int index = j * n + i;
@@ -196,7 +205,7 @@ struct Learner
                 if (i <= assignments[j].size()){
                     float groundtruth = (assignments[j].at(i-1) ? 1.0 : 0.0);
                     float delta = (params.z[index] - groundtruth);
-                    b_loss -=  delta * delta;
+                    b_loss =  delta * delta;
                 }
             }
             printf("batch=%d, b_loss=%f\n", j, b_loss);
@@ -224,6 +233,9 @@ struct Learner
                     }
                     int index = i * m  + j;
                     params.W[base + index] = res;
+                    if(res > 10 || res < -10) {
+                        printf("res = %f is too large!\n", res);
+                    }
                 }
             }
 
@@ -269,6 +281,11 @@ struct Learner
     }
 
     void forward(mix_t& params){
+        std::random_shuffle(perm.begin(), perm.end());
+        for(int i = 0; i < perm.size(); ++i) printf("%d ", perm[i]);
+        printf("\n");
+        int dbg2 = 0;
+
         mix_init_launcher_cpu(params, perm.data());
         prepare_W(params);
 
@@ -276,12 +293,12 @@ struct Learner
 
         mix_forward_launcher_cpu(params, 10, 1e-10);
 
-        printf("after mixing, V:");
-        for (int i=0; i< params.b; ++i) {
-            printf("for batch = %d\n", i);
-            const int base = i * params.n * params.k; 
-            dbgout2D("", params.V + base, params.n, params.k);
-        }
+        // printf("after mixing, V:");
+        // for (int i=0; i< params.b; ++i) {
+        //     printf("for batch = %d\n", i);
+        //     const int base = i * params.n * params.k; 
+        //     dbgout2D("", params.V + base, params.n, params.k);
+        // }
 
         dbgout2D("\npredicted outputs after forward process:\n", params.z, params.b, params.n);
         dbgout2D("in forward, S:\n", params.S, params.n, params.m);
@@ -291,21 +308,28 @@ struct Learner
         int dbg = 0;
 
     }
+    void grad_zero(mix_t& params) {
+        const int n = params.n;
+        const int m = params.m;
+        const int b = params.b; 
+        const int k = params.k;
 
+        szero(params.dS, b * n * m);
+        szero(params.Phi, b * k * m);
+        szero(params.U, b * n * k);
+
+    }
     void backward(mix_t& params) {
+        
         // dz depends on the downstream loss function
         compute_loss(params);
         printf("\n");
         compute_dz(params);
 
-        memset(params.dS, 0, sizeof(params.dS));
-        memset(params.Phi, 0, sizeof(params.Phi));
-        memset(params.U, 0, sizeof(params.U));
-
+        
         float prox_lam = 0.01;
 
         //show_dS(params);
-
         // compute gradient using Mixing method
         mix_backward_launcher_cpu(params, prox_lam);
 
@@ -324,8 +348,11 @@ struct Learner
         construct_mix_params(params);
         AdamSNet adam(params.n, params.m);
 
-        for(int iter = 0; iter < 10; ++iter) {
+        for(int iter = 0; iter < 20; ++iter) {
             forward(params);
+            
+            grad_zero(params);
+
             backward(params);
 
             //dbgout2D("show_dS_sum:\n", params.dS_sum, params.n, params.m);
@@ -333,9 +360,11 @@ struct Learner
             compute_dS_sum(params);
 
             dbgout2D("show_dS_sum:\n", params.dS_sum, params.n, params.m);
+            for (int i=0; i < params.n * params.m; ++i) printf("%.9f ", params.dS_sum[i]);
+            printf("\n");
 
-            //adam.step(params.S, params.dS);
-            update_S(params);
+            adam.step(params.S, params.dS);
+            //update_S(params);
 
             // update Snrms
             compute_Snrms(params);
@@ -349,8 +378,13 @@ struct Learner
 int main()
 {
     // x XOR y =z
-    std::vector<std::vector<bool>> assignments = {{true, true, false}, {false, false, false}, {true, false, true}, {false, true, true}};
     std::vector<int> input_dims = {1, 2};
+    std::vector<std::vector<bool>> assignments = {
+        {true, false, true}, 
+        {false, true, true},
+        {true, true, false}, 
+        {false, false, false},
+        }; // a bit strange, the order matters!!
 
     Learner L(std::move(input_dims), std::move(assignments), 4, 2);
 
